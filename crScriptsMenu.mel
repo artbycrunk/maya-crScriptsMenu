@@ -1,0 +1,366 @@
+/* ******************************* 
+******************************* 
+
+Scripts Menu Ver 1.5
+
+Created On October 12th 2008
+Authored By - Crunk AKA Savio Fernandes
+
+Install & Execute:
+-Copy this file to your maya default script directory
+-Source "crScriptsMenu.mel";
+
+***Note u only need to source it the first time, 
+it will automatically be added the next time u open maya.***
+
+******************************* 
+********************************** 
+
+Updates:
+
+Oct31, 2009 - Added Support for Searching Scripts.
+Oct30, 2009 - Added Support for NativePath.
+Jan12, 2009 - Added Directory Listing Support.
+Dec15, 2008 - Added Browse Button For Paths.
+
+
+********************************** */
+////////////////////////////////////////////////
+// Adds a source statement to the UserSetup.mel 
+// So u only need to source this scripts once.
+// Note : the line is append to the existing Usersetup.mel and will keep all history intact. 
+// If does not exist UserSetup.mel will be created.
+////////////////////////////////////////////////
+
+	string $array[];
+	string $contents;
+	string $aboutwindow;
+	string $prefswindow;
+	int $numfiles;
+	
+	$ver = getApplicationVersionAsFloat();
+	
+	string $UserSetupFileName =  (`internalVar -userScriptDir`)+ "UserSetup.mel";
+
+	$fileId=`fopen $UserSetupFileName "r"`;
+	$contents =`fread $fileId $contents`;
+	fclose $fileId;
+	$array = stringToStringArray($contents, " ");
+	$search = ("\""+"crScriptsMenu.mel"+"\""+";");	//"
+	int $found = stringArrayContains($search, $array);
+		if ($found == 0)
+		{
+			$fileId=`fopen $UserSetupFileName "a"`;
+			fprint $fileId ("source" + " " + "\"" + "crScriptsMenu.mel" + "\"" + ";" + " " + "MakeScriptMenu" + ";");
+			fclose $fileId;
+		}
+
+
+global proc SourceRun(string $sPath, string $sName) {
+
+	string $sCommandString = "source \"" + $sPath + "\"; " + $sName + ";";
+	eval($sCommandString);
+
+}
+
+
+global proc Refresh(){
+
+	MakeScriptMenu;
+
+}
+
+global proc MakeScriptMenu()
+{
+	global string $ScriptsMenu;
+	global string $ItemMenu;
+	global string $gMainWindow;
+	global string $temp;
+	global string $temp_dir;
+	string $dirx[];
+	string $menu_name = "ScriptsMenu";
+	
+	$dirx[0] = `optionVar -q  "melScriptDir1"`;
+	$dirx[1] = `optionVar -q  "melScriptDir2"`;
+	float $ext;
+	string $xcmd;
+	
+	if (`menu -exists $ScriptsMenu`){deleteUI $ScriptsMenu;};
+	if	(`window -exists crScriptsMenuSearchUI`) {deleteUI crScriptsMenuSearchUI; }
+	
+	
+	$temp2 = "getFileList -folder" + " " + "\""+ $dirx[1] + "\"" + " " + "-filespec \"*.mel\"";
+	
+	chdir $dirx[0];
+	
+	$temp1 = "getFileList -folder" + " " + "\""+ $dirx[0] + "\"";
+	$temp3 = "getFileList -folder" + " " + "\""+ $dirx[0] + "\"" + " " + "-filespec \"*.mel\"";
+	$numfiles2 = size(eval($temp2));
+	$numfiles1 = size(eval($temp1));
+	
+	print ("\n\ ScriptsMenu v1.5..........................: Created by Savio Fernandes (Crunk)\n");
+	print ("\n First Scripts Directory ..................: " + $dirx[0]); 
+		if ($dirx[1] != "/"){
+			print ("\n Second Scripts Directory .................: " + $dirx[1]);
+		}else{
+			print ("\n Second Scripts Directory .................: " + "Undefined");
+		}
+			print ("\n Total Scripts Files Loaded................: " + ($numfiles1 + $numfiles2) +"\n\n");
+	
+	if($dirx[0]==`pwd`+"/")
+		{
+
+	if(size(eval($temp1)) <= 0)
+		{
+		$ScriptsMenu = `menu -p $gMainWindow -to true -l $menu_name`;
+		string $rh =  "No Script files available in " + $menu_name + " Script Directory";
+		menuItem -sm false -p $ScriptsMenu -l $rh;
+		menuItem -divider true;
+		menuItem -sm false -p $ScriptsMenu -l "Prefrences" -command "Prefrences()";
+		error ("No Script files available in " + $menu_name  + " Script Directory");
+		}
+	else
+		{
+		string $fs1[] = eval($temp1);
+		string $files[] = eval($temp3);
+		string $fs2[] = eval($temp2);
+		string $dir[];
+		for ($fs in $fs1)
+		{
+		$array = stringToStringArray( $fs, ".");
+			if($array[1] == "")
+			{
+				$dir[size($dir)] = $array[0];
+			}
+		}
+		$ScriptsMenu = `menu -p $gMainWindow -to true -l $menu_name`;
+		menuItem -sm false -p $ScriptsMenu -l $dirx[0] -bld true;
+		menuItem -divider true;	
+		menuItem -sm false -p $ScriptsMenu -l "Search Scripts" -command "Search()";
+		menuItem -sm false -p $ScriptsMenu -l "Re-Build Menu" -command "Refresh()";
+		menuItem -divider true;	
+		for ($directory in $dir)
+		{
+		$ItemMenu = `menuItem -subMenu true -p $ScriptsMenu -l $directory -bld 1`;
+		string $dir_path = ($directory + "/");
+		$temp_dir = "getFileList -folder" + " " + "\""+ $dirx[0] + $dir_path + "\"" + " " + "-filespec \"*.mel\""; 
+			
+			string $fs_dir[] = eval($temp_dir);
+				for ($i=0;$i<size($fs_dir);$i++)
+				{
+				$fs_array = stringToStringArray( $fs_dir[$i], "."); 
+				$xcmd = "SourceRun(\"" + $dirx[0] + $dir_path + $fs_array[0] + ".mel" + "\",\"" + $fs_array[0] + "\")"; //"
+				menuItem -p $ItemMenu -l ($fs_array[0]) -command $xcmd;  
+				}
+			setParent -menu ..;	
+			
+		}
+		if(size($files) != 0)
+		{
+		for ($i=0;$i<size($files);$i++)
+			{
+			$files_array = stringToStringArray( $files[$i], ".");
+			$xcmd = "SourceRun(\"" + $dirx[0] + $files_array[0] + ".mel" + "\",\"" + $files_array[0] + "\")"; //"
+			menuItem -sm false -p $ScriptsMenu -l $files_array[0] -command $xcmd;  
+			}
+			
+		if ($dirx[1] != ""){	
+		if(size(eval($temp2)) <= 0 || $dirx[1] == "/")
+		{
+		menuItem -divider true;
+		}
+		else{
+			menuItem -divider true;
+			menuItem -sm false -p $ScriptsMenu -l $dirx[1] ; 
+			menuItem -divider true;	
+			for ($i=0;$i<size($fs2);$i++)
+				{
+				$ext = size($fs2[$i]) - 4;
+				$temp2 = eval("substring \"" + $fs2[$i] + "\" 1 " + $ext);
+				$xcmd = "SourceRun(\"" + $dirx[1] + $temp2 + ".mel" + "\",\"" + $temp2 + "\")"; //"
+				menuItem -sm false -p $ScriptsMenu -l $temp2  -command $xcmd;  
+				}
+			}
+		}
+			menuItem -divider true;	
+			menuItem -sm false -p $ScriptsMenu -l "Prefrences" -command "Prefrences()";
+			menuItem -sm false -p $ScriptsMenu -l "About" -command "About()";  
+			}
+		}
+	}
+
+	else
+
+	{
+	$ScriptsMenu = `menu -p $gMainWindow -to true -l $menu_name`;
+	string $rh =  "No Script Directory Set";
+	menuItem -sm false -p $ScriptsMenu -l $rh;
+	menuItem -divider true;
+	menuItem -sm false -p $ScriptsMenu -l "Prefrences" -command "Prefrences()";
+	menuItem -sm false -p $ScriptsMenu -l "" -command "Search()";
+	menuItem -sm false -p $ScriptsMenu -l "About" -command "About()";
+	error ( "ScriptsMenu is unable to access the specified directory: " + $dirx[0]);
+
+	}
+	
+}
+
+global proc Search()
+{
+	global string $crScriptsMenuFilter;
+	string $fs1[];
+	string $dir[];
+	
+	$dirx[0] = `optionVar -q  "melScriptDir1"`;
+	if	(`window -exists crScriptsMenuSearchUI`) {deleteUI crScriptsMenuSearchUI; }
+	
+	window	-wh 282 600 -title "crScriptsMenu Search" crScriptsMenuSearchUI;
+	
+	scrollLayout -width 282 crScriptsMenuSearchScrollLayout1;
+	columnLayout -width 282 crScriptsMenuSearchColumnLayout1;
+	rowLayout -numberOfColumns 2 -columnWidth2 (ceil(250 * 0.2)) (ceil(250 * 0.8));
+	text -width (ceil(250 * 0.2)) -label " Search:";
+	textField -width (ceil(250 * 0.8)) -text $crScriptsMenuFilter -cc crScriptsMenuSearchFilter crScriptsMenuSearchUITextFieldFilter;
+	setParent..;
+	separator -width 250;
+	separator -width 250;
+	
+	clear $fs1;
+	$fs1 = `getFileList -folder ($dirx[0])`;
+	$dir[0] = "base";
+	
+	for ($fs in $fs1)
+		{
+		$array = stringToStringArray( $fs, ".");
+			if($array[1] == "")
+			{
+				$dir[size($dir)] = $array[0];
+			}
+		}
+	
+	$numMelDirectories = size($dir);
+	
+	for	($i=0; $i < $numMelDirectories; $i++)
+	{
+	string $frameLABEL;
+	clear $fs1;
+	string $currDIR;
+	
+	if($dir[$i] == "base"){
+		$currDIR = $dirx[0];
+	}else{
+		$currDIR = ($dirx[0])+($dir[$i]);
+	}
+	
+	$frameLABEL = ($currDIR);
+	$fs1 = `getFileList -folder (($currDIR)+"/") -filespec ("*" + $crScriptsMenuFilter + "*.mel")`;
+	
+	frameLayout	-width 250 -collapsable true -collapse false -label $frameLABEL ("crScriptsMenuSearchUIFrameLayout" + $i);
+	columnLayout -width 250("crScriptsMenuSearchUISubColumnLayout" + $i);
+	separator -width 250 -style "out";
+	
+	for	($k = 0; $k < size($fs1); $k++)
+		{
+		$ext = size($fs1[$k]) - 4;
+		$temp2 = eval("substring \"" + $fs1[$k] + "\" 1 " + $ext);
+		$xcmd = "SourceRun(\"" + $currDIR + "/"+ $temp2 + ".mel" + "\",\"" + $temp2 + "\")"; //"
+		//print $xcmd;
+		rowLayout -numberOfColumns 2 -columnAlign2 "left" "center" -columnWidth2 221 25 ("crScriptsMenuSearchSubRowLayout" + $i + "_" + $k);
+		textField -width 221 -text ($fs1[$k]) ("crScriptsMenuTextField" + $i + "_" + $k);
+		button -w 25 -align "center" -label "S" -c $xcmd -backgroundColor 0.5 0.5 0.5 ("crScriptsMenuSearchButtonS_" + $i + "_" + $k);
+		setParent..;
+		}
+	setParent..;
+	setParent..;	
+	}
+	showWindow crScriptsMenuSearchUI;
+
+}
+
+global proc crScriptsMenuSearchFilter()
+{
+	global string $crScriptsMenuFilter;
+
+	$crScriptsMenuFilter = `textField -query -text crScriptsMenuSearchUITextFieldFilter`;
+
+	deleteUI crScriptsMenuSearchUI;
+	Search();
+}
+
+global proc PathChange(int $i)
+{
+	string $filepath2;
+	int $pathnum = $i;
+	$filepath2 = `textField -q -text ("MelScriptPath"+$pathnum)`;
+	string $slash = `substring $filepath2 (size($filepath2)-0) (size($filepath2))`;
+	
+	if($slash == "/"){
+			$filepath = fromNativePath( $filepath2 );
+			optionVar -stringValue ("melScriptDir"+$pathnum) $filepath;
+		}else{
+			$filepath2 = `textField -q -text ("MelScriptPath"+$pathnum)` + "/";
+			$filepath = fromNativePath( $filepath2 );
+			optionVar -stringValue ("melScriptDir"+$pathnum) $filepath;
+		}
+	Refresh();
+}
+
+global proc setpath(int $i)
+{
+	int $pathnum = $i;
+	fileBrowserDialog -m 4 -fc ("ScriptPath_Dir"+$pathnum) -an  ("Browse Script Path "+$pathnum) -om "Reference";
+}
+
+global proc int ScriptPath_Dir1( string $filename, string $fileType  )
+{
+	textField  -edit -text ($filename+"/") MelScriptPath1;
+	PathChange(1);
+	return 1;
+}
+
+global proc int ScriptPath_Dir2( string $filename, string $fileType  )
+{
+	textField  -edit -text ($filename+"/") MelScriptPath2;
+	PathChange(2);
+	return 1;
+}
+
+global proc Prefrences()
+{
+	if (`window -q -ex SMPrefsWin`) deleteUI SMPrefsWin;
+	string $varpath1 = `optionVar -q  "melScriptDir1"`;
+	string $varpath2 = `optionVar -q  "melScriptDir2"`;
+	string $prefswindow = `window -title "Script Prefrences" -iconName "Short Name" -widthHeight 390 110 -s 0 SMPrefsWin`;
+	rowColumnLayout -numberOfColumns 3  -columnWidth 1 75 -columnWidth 2 250 -columnWidth 3 50;
+	
+	text -label "  Script Path1";
+	string $path1field = `textField -text $varpath1 -cc "PathChange(1)" MelScriptPath1`;
+	string $path1Buttn = `button -l "Browse" -c ("setpath(1)")`;
+	
+	text -label "  Script Path2";
+	string $path2field = `textField -text $varpath2 -cc "PathChange(2)" MelScriptPath2`;
+	string $path2Buttn = `button -l "Browse" -c ("setpath(2)")`;
+	
+	separator -style "none";
+	button -label "Close" -command ("deleteUI -window " + $prefswindow);
+	separator -style "none";
+	setParent ..;
+	showWindow $prefswindow;
+
+}
+
+global proc About()
+{
+	string $aboutwindow = `window -title ("About ScriptsMenu v1.5") -iconName "Short Name" -widthHeight 400 122 -sizeable 1 ScriptMenuAboutWin`;
+	columnLayout -adjustableColumn true;
+	text -label "ScriptsMenu v1.5";
+	text -label "Created by Crunk"; 
+	button -label "www.artbycrunk.com" -c ("showHelp -a \"mailto:artbycrunk@gmail.com\"; ");
+	text -label ""; 
+	button -label "Close" -command ("deleteUI -window " + $aboutwindow);
+	setParent ..;
+	showWindow $aboutwindow;
+
+}
+
+MakeScriptMenu;
